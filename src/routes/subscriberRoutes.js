@@ -1,7 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const { subscribe } = require('../controllers/subscriberController');
+const {
+  subscribe,
+  unsubscribe,
+} = require('../controllers/subscriberController');
 
 router.post('/subscribe', subscribe);
-
+router.get('/unsubscribe', unsubscribe);
 module.exports = router;
