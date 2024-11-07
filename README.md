@@ -2,6 +2,8 @@
 
 Subscription service for the landing pages testing
 
+`npm install -g pnpm`
+
 `pnpm install`
 
 `docker build -t subscription-api .`
