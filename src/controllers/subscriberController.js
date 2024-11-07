@@ -1,42 +1,44 @@
+const sendMail = require('../helpers/sendMail');
 const Subscriber = require('../models/Subscriber');
-const nodemailer = require('nodemailer');
-const { APP_URL, PORT, EMAIL_USER, EMAIL_PASS } = process.env;
+const { APP_URL, PORT, RECAPTCHA_SECRET } = process.env;
 
 exports.subscribe = async (req, res) => {
-  const { email } = req.body;
+  const { email, recaptchaToken } = req.body;
   try {
+    // recaptcha check:
+    const recaptchaResponse = await fetch(
+      `https://www.google.com/recaptcha/api/siteverify`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          secret: RECAPTCHA_SECRET,
+          response: recaptchaToken,
+        }),
+      }
+    );
+
+    const recaptchaData = await recaptchaResponse.json();
+
+    if (!recaptchaData.success) {
+      return res
+        .status(400)
+        .json({ error: 'reCAPTCHA verification failed. Please try again.' });
+    }
+
+    // subscription:
     const newSubscriber = new Subscriber({ email });
     await newSubscriber.save();
 
     const unsubscribeLink = `${APP_URL}:${PORT}/api/subscribers/unsubscribe?token=${newSubscriber.unsubscribeToken}`;
-
-    const transporter = nodemailer.createTransport({
-      service: 'Gmail',
-      host: 'smtp.gmail.com',
-      port: 465,
-      secure: true,
-      auth: {
-        user: EMAIL_USER,
-        pass: EMAIL_PASS,
-      },
-    });
-
-    // Send email with unsubscribe link
-    await transporter.sendMail(
-      {
-        from: EMAIL_USER,
-        to: email,
-        subject: 'Subscription Confirmation',
-        text: `Thank you for subscribing! If you wish to unsubscribe, click here: ${unsubscribeLink}`,
-      },
-      (error, info) => {
-        if (error) {
-          console.error('Error sending email: ', error);
-        } else {
-          console.log('Email sent: ', info.response);
-        }
-      }
-    );
+    const emailObj = {
+      to: email,
+      subject: 'Subscription Confirmation',
+      text: `Thank you for subscribing! If you wish to unsubscribe, click here: ${unsubscribeLink}`,
+    };
+    await sendMail(emailObj);
 
     res.status(201).json({ message: 'Successfully subscribed' });
   } catch (error) {
